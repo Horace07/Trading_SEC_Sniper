@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: trading_sec_sniper_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sniper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sniper}
+      POSTGRES_DB: ${POSTGRES_DB:-trading_sec_sniper}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Scripts exécutés une seule fois, à la création initiale du volume,
+      # dans l'ordre alphabétique (01_, 02_, 03_).
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sniper}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
