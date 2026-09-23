@@ -1,8 +1,11 @@
 """Chef d'orchestre : enchaîne les Phases 1 à 4.
 
 Toute la mesure de latence est faite ici, sous forme de timestamps passés
-directement dans un `TradeAuditEvent` remis au TelemetryWorker — le Sniper
-lui-même n'importe jamais `psycopg2` et ne fait aucune I/O base de données.
+directement dans un `TradeAuditEvent` remis au TelemetryWorker. Seule la
+Phase 1 (Pre-Market, `Sniper.start`) touche PostgreSQL — pour charger le
+consensus EPS/Revenue avant l'ouverture du marché ; le chemin chaud
+(`Sniper.handle_filing`, Phases 2/3) n'importe lui-même jamais `psycopg2` et
+ne fait aucune I/O base de données.
 """
 
 from __future__ import annotations
@@ -14,6 +17,8 @@ from decimal import Decimal
 from src.config import settings
 from src.core.nlp_regex import extract_financials
 from src.core.risk_manager import position_size
+from src.core.signal import evaluate_earnings_surprise
+from src.data.assets_repository import AssetConsensus, load_watchlist_consensus
 from src.data.db_worker import TelemetryWorker, TradeAuditEvent
 from src.data.sec_client import FilingEvent, SECClient
 from src.execution.alpaca_router import AlpacaRouter
@@ -28,38 +33,67 @@ class Sniper:
         self.sec_client = SECClient(settings.sec)
         self.router = AlpacaRouter(settings.alpaca, settings.risk)
         self.telemetry = TelemetryWorker(settings.database)
+        self._watchlist: dict[str, AssetConsensus] = {}
 
     def start(self) -> None:
-        """Phase 1 — Pre-Market : connexions persistantes + archiviste en marche."""
+        """Phase 1 — Pre-Market : consensus EPS/Revenue + connexions persistantes."""
+        self._watchlist = load_watchlist_consensus(settings.database)
         self.telemetry.start()
-        logger.info("Sniper armé. Connexions Keep-Alive ouvertes, worker télémétrie actif.")
+        logger.info(
+            "Sniper armé. %d symbole(s) en watchlist, connexions Keep-Alive ouvertes, worker télémétrie actif.",
+            len(self._watchlist),
+        )
 
     def handle_filing(self, filing: FilingEvent) -> None:
-        """Phase 2 + 3 : détection, extraction, vérification liquidité, tir, log."""
+        """Phase 2 + 3 : détection, extraction, signal réel-vs-consensus,
+        vérification liquidité, tir, log."""
         t_publish = datetime.now(timezone.utc)
 
         raw_text = self.sec_client.download_document_text(filing)
         extraction = extract_financials(raw_text)
         t_regex_done = datetime.now(timezone.utc)
 
-        quote, liquidity = self.router.check_liquidity_circuit_breaker(filing.symbol)
-        t_spread_checked = datetime.now(timezone.utc)
+        consensus = self._watchlist.get(filing.symbol)
+        signal = evaluate_earnings_surprise(
+            extraction,
+            consensus.consensus_eps if consensus else None,
+            consensus.consensus_revenue if consensus else None,
+            settings.risk,
+        )
 
         event = TradeAuditEvent(
             symbol=filing.symbol,
             filing_accession_number=filing.accession_number,
             timestamp_sec_publish=t_publish,
             timestamp_regex_done=t_regex_done,
-            timestamp_spread_checked=t_spread_checked,
             raw_text_snippet=extraction.raw_snippet,
             regex_eps=extraction.eps,
             regex_revenue=extraction.revenue,
             regex_confidence=extraction.confidence,
-            alpaca_bid_price=quote.bid_price,
-            alpaca_ask_price=quote.ask_price,
-            alpaca_bid_ask_spread_at_execution=liquidity.spread_pct,
-            alpaca_book_volume=quote.book_volume,
+            consensus_eps=consensus.consensus_eps if consensus else None,
+            consensus_revenue=consensus.consensus_revenue if consensus else None,
+            eps_surprise_pct=signal.eps_surprise_pct,
+            revenue_surprise_pct=signal.revenue_surprise_pct,
+            decision_reason=signal.reason.value,
         )
+
+        if not signal.tradeable:
+            event.order_status = "cancelled"
+            self.telemetry.record_trade_audit(event)
+            logger.info(
+                "Pas de signal exploitable pour %s: %s (eps_surprise=%s%%)",
+                filing.symbol,
+                signal.reason.value,
+                signal.eps_surprise_pct,
+            )
+            return
+
+        quote, liquidity = self.router.check_liquidity_circuit_breaker(filing.symbol)
+        event.timestamp_spread_checked = datetime.now(timezone.utc)
+        event.alpaca_bid_price = quote.bid_price
+        event.alpaca_ask_price = quote.ask_price
+        event.alpaca_bid_ask_spread_at_execution = liquidity.spread_pct
+        event.alpaca_book_volume = quote.book_volume
 
         if not liquidity.passed:
             event.order_status = "cancelled"

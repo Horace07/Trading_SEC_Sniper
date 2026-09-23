@@ -61,13 +61,19 @@ aussi appliqués directement dans PostgreSQL par `sql/04_comments.sql`
 ## 3. Déroulé fonctionnel (les 4 phases)
 
 **Phase 1 — Pre-Market (`Sniper.start`)**
-Chargement du consensus EPS depuis la DB, ouverture de connexions
-persistantes (Keep-Alive) vers Alpaca pour éliminer le coût de handshake TCP/TLS
-au moment critique.
+Chargement du consensus EPS/Revenue depuis `sniper.assets`
+(`data/assets_repository.py`), ouverture de connexions persistantes
+(Keep-Alive) vers Alpaca pour éliminer le coût de handshake TCP/TLS au moment
+critique.
 
 **Phase 2 — L'Événement (`Sniper.handle_filing`)**
 Détection du 8-K (`SECClient.poll_new_filings`), téléchargement du texte,
-extraction Regex (`core/nlp_regex.py`), interrogation du spread Alpaca.
+extraction Regex (`core/nlp_regex.py`). Le résultat est immédiatement
+confronté au consensus chargé en Phase 1 (`core/signal.evaluate_earnings_surprise`) :
+sans EPS extrait, sans consensus pour ce symbole, ou avec une confiance Regex
+trop basse (`MIN_REGEX_CONFIDENCE`), aucun signal n'est déclenché — de même si
+le beat ne dépasse pas `MIN_EPS_SURPRISE_PCT`. Seul un vrai earnings beat
+laisse passer la suite. Le Sniper interroge alors le spread Alpaca.
 **Circuit Breaker Liquidité** (`core/risk_manager.check_liquidity`) : si le
 spread bid/ask dépasse `MAX_SPREAD_PCT` (1.5 % par défaut) ou si le carnet est
 vide, le trade est annulé.
@@ -93,21 +99,25 @@ Trading_SEC_Sniper/
 ├── sql/
 │   ├── 01_init_assets.sql
 │   ├── 02_create_audits.sql
-│   └── 03_golden_hour.sql
+│   ├── 03_golden_hour.sql
+│   └── 05_add_earnings_signal_columns.sql
 ├── src/
 │   ├── config.py            # Chargement centralisé du .env
 │   ├── core/
 │   │   ├── nlp_regex.py     # Extraction EPS/Revenue
+│   │   ├── signal.py        # Comparaison réel (Regex) vs consensus
 │   │   └── risk_manager.py  # Circuit breakers liquidité + risque
 │   ├── data/
-│   │   ├── sec_client.py    # Client SEC EDGAR
-│   │   └── db_worker.py     # Worker télémétrie asynchrone
+│   │   ├── sec_client.py           # Client SEC EDGAR
+│   │   ├── assets_repository.py    # Chargement du consensus (Phase 1)
+│   │   └── db_worker.py            # Worker télémétrie asynchrone
 │   ├── execution/
 │   │   ├── alpaca_router.py # Routage des ordres + spread
 │   │   └── golden_hour.py   # Tracker WebSocket post-trade
 │   └── main_sniper.py       # Orchestrateur
 └── tests/
     ├── test_regex_parser.py
+    ├── test_earnings_signal.py
     └── test_circuit_breaker.py
 ```
 
@@ -191,5 +201,8 @@ service `postgres` local, faisant tourner deux instances Postgres pour rien.
 - `tests/test_regex_parser.py` — faux textes SEC pour vérifier que la Regex
   extrait correctement EPS/Revenue, y compris les cas négatifs (parenthèses)
   et les valeurs manquantes, sans jamais lever d'exception.
+- `tests/test_earnings_signal.py` — vérifie que seul un vrai earnings beat
+  déclenche un signal `buy` (miss, EPS manquant, consensus manquant, Regex
+  peu fiable ou beat sous le seuil ne tradent jamais).
 - `tests/test_circuit_breaker.py` — simulation de spreads énormes et de
   carnets vides pour vérifier que le trade est bien annulé.

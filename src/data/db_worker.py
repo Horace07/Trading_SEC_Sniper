@@ -43,6 +43,11 @@ class TradeAuditEvent:
     regex_eps: Optional[Decimal] = None
     regex_revenue: Optional[Decimal] = None
     regex_confidence: Optional[float] = None
+    consensus_eps: Optional[Decimal] = None
+    consensus_revenue: Optional[Decimal] = None
+    eps_surprise_pct: Optional[Decimal] = None
+    revenue_surprise_pct: Optional[Decimal] = None
+    decision_reason: Optional[str] = None
     alpaca_bid_price: Optional[Decimal] = None
     alpaca_ask_price: Optional[Decimal] = None
     alpaca_bid_ask_spread_at_execution: Optional[Decimal] = None
@@ -72,6 +77,7 @@ INSERT INTO sniper.trade_audits (
     symbol, filing_accession_number,
     timestamp_sec_publish, timestamp_regex_done, timestamp_spread_checked, timestamp_order_sent,
     raw_text_snippet, regex_eps, regex_revenue, regex_confidence,
+    consensus_eps, consensus_revenue, eps_surprise_pct, revenue_surprise_pct, decision_reason,
     alpaca_bid_price, alpaca_ask_price, alpaca_bid_ask_spread_at_execution, alpaca_book_volume,
     order_id, order_side, order_type, order_qty, order_limit_price, order_status,
     circuit_breaker_triggered, circuit_breaker_reason
@@ -79,6 +85,7 @@ INSERT INTO sniper.trade_audits (
     %(symbol)s, %(filing_accession_number)s,
     %(timestamp_sec_publish)s, %(timestamp_regex_done)s, %(timestamp_spread_checked)s, %(timestamp_order_sent)s,
     %(raw_text_snippet)s, %(regex_eps)s, %(regex_revenue)s, %(regex_confidence)s,
+    %(consensus_eps)s, %(consensus_revenue)s, %(eps_surprise_pct)s, %(revenue_surprise_pct)s, %(decision_reason)s,
     %(alpaca_bid_price)s, %(alpaca_ask_price)s, %(alpaca_bid_ask_spread_at_execution)s, %(alpaca_book_volume)s,
     %(order_id)s, %(order_side)s, %(order_type)s, %(order_qty)s, %(order_limit_price)s, %(order_status)s,
     %(circuit_breaker_triggered)s, %(circuit_breaker_reason)s

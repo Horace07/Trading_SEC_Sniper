@@ -47,6 +47,11 @@ le trade parte réellement ou soit annulé par un circuit breaker.
 | `regex_eps` | `NUMERIC(12,4)` | BPA extrait par la Regex (`NULL` si non trouvé). |
 | `regex_revenue` | `NUMERIC(18,2)` | Chiffre d'affaires extrait par la Regex (`NULL` si non trouvé). |
 | `regex_confidence` | `NUMERIC(4,3)` | Proportion des deux champs (EPS, Revenue) effectivement trouvés : `0`, `0.5` ou `1`. |
+| `consensus_eps` | `NUMERIC(12,4)` | Consensus EPS de `sniper.assets` copié au moment de la décision (`core/signal.py`). |
+| `consensus_revenue` | `NUMERIC(18,2)` | Consensus Revenue de `sniper.assets` copié au moment de la décision. |
+| `eps_surprise_pct` | `NUMERIC(8,3)` | `(regex_eps - consensus_eps) / ABS(consensus_eps) * 100`. Positif = beat, négatif = miss. `NULL` si EPS ou consensus manquant. |
+| `revenue_surprise_pct` | `NUMERIC(8,3)` | Même formule pour le revenue. Informatif uniquement, ne bloque jamais le trade. |
+| `decision_reason` | `TEXT` | Raison du signal réel-vs-consensus : `eps_beat` (achat), `eps_miss_or_inline`, `missing_eps`, `no_consensus`, ou `low_regex_confidence`. |
 | `alpaca_bid_price` | `NUMERIC(12,4)` | Prix bid Alpaca au moment de la vérification de liquidité. |
 | `alpaca_ask_price` | `NUMERIC(12,4)` | Prix ask Alpaca au moment de la vérification de liquidité. |
 | `alpaca_bid_ask_spread_at_execution` | `NUMERIC(8,5)` | Écart bid/ask en % du prix médian. Seuil du Circuit Breaker Liquidité : `MAX_SPREAD_PCT` (1.5 % par défaut). |

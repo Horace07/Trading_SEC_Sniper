@@ -83,6 +83,8 @@ class RiskConfig:
     take_profit_pct: float = field(default_factory=lambda: _get_float("TAKE_PROFIT_PCT", 5.0))
     trailing_stop_pct: float = field(default_factory=lambda: _get_float("TRAILING_STOP_PCT", 2.0))
     golden_hour_minutes: int = field(default_factory=lambda: _get_int("GOLDEN_HOUR_MINUTES", 60))
+    min_eps_surprise_pct: float = field(default_factory=lambda: _get_float("MIN_EPS_SURPRISE_PCT", 0.0))
+    min_regex_confidence: float = field(default_factory=lambda: _get_float("MIN_REGEX_CONFIDENCE", 0.5))
 
 
 @dataclass(frozen=True)
