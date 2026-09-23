@@ -2,7 +2,9 @@
 -- l'exécution et cycle de vie de l'ordre. Écrite exclusivement par le
 -- TelemetryWorker (src/data/db_worker.py), jamais par le Sniper lui-même.
 
-CREATE TABLE IF NOT EXISTS trade_audits (
+CREATE SCHEMA IF NOT EXISTS sniper;
+
+CREATE TABLE IF NOT EXISTS sniper.trade_audits (
     id                       BIGSERIAL PRIMARY KEY,
     symbol                   TEXT NOT NULL,
     filing_accession_number  TEXT,
@@ -38,6 +40,6 @@ CREATE TABLE IF NOT EXISTS trade_audits (
     created_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_trade_audits_symbol ON trade_audits (symbol);
-CREATE INDEX IF NOT EXISTS idx_trade_audits_created_at ON trade_audits (created_at);
-CREATE INDEX IF NOT EXISTS idx_trade_audits_order_status ON trade_audits (order_status);
+CREATE INDEX IF NOT EXISTS idx_trade_audits_symbol ON sniper.trade_audits (symbol);
+CREATE INDEX IF NOT EXISTS idx_trade_audits_created_at ON sniper.trade_audits (created_at);
+CREATE INDEX IF NOT EXISTS idx_trade_audits_order_status ON sniper.trade_audits (order_status);

@@ -68,7 +68,7 @@ class GoldenHourTick:
 
 
 _INSERT_AUDIT_SQL = """
-INSERT INTO trade_audits (
+INSERT INTO sniper.trade_audits (
     symbol, filing_accession_number,
     timestamp_sec_publish, timestamp_regex_done, timestamp_spread_checked, timestamp_order_sent,
     raw_text_snippet, regex_eps, regex_revenue, regex_confidence,
@@ -86,7 +86,7 @@ INSERT INTO trade_audits (
 """
 
 _INSERT_TICK_SQL = """
-INSERT INTO golden_hour_ticks (symbol, "timestamp", price, volume, vwap, trade_audit_id)
+INSERT INTO sniper.golden_hour_ticks (symbol, "timestamp", price, volume, vwap, trade_audit_id)
 VALUES (%(symbol)s, %(timestamp)s, %(price)s, %(volume)s, %(vwap)s, %(trade_audit_id)s)
 ON CONFLICT (symbol, "timestamp") DO NOTHING
 """
@@ -94,8 +94,8 @@ ON CONFLICT (symbol, "timestamp") DO NOTHING
 
 class TelemetryWorker:
     """Thread secondaire : seule composante du projet qui écrit dans
-    `trade_audits` / `golden_hour_ticks`. Le Sniper ne détient aucune
-    connexion PostgreSQL."""
+    `sniper.trade_audits` / `sniper.golden_hour_ticks`. Le Sniper ne détient
+    aucune connexion PostgreSQL."""
 
     def __init__(self, db_config: DatabaseConfig, batch_size: int = 20, flush_interval: float = 0.5):
         self._db_config = db_config

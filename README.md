@@ -41,13 +41,17 @@ retarder ou bloquer l'envoi d'un ordre.
 
 ## 2. Base de données (PostgreSQL + TimescaleDB)
 
-Trois tables (voir `sql/`) :
+Trois tables, toutes dans un schéma dédié **`sniper`** (voir `sql/`) — pas
+`public` : ça permet de faire cohabiter ce projet avec d'autres bases de
+travail existantes sur la même instance PostgreSQL (jointures SQL directes,
+ex: `sniper.trade_audits JOIN public.assets`), sans collision de noms de
+table avec un autre projet.
 
 | Table | Rôle |
 |---|---|
-| `assets` | Watchlist du jour + consensus EPS/Revenue chargé en pre-market |
-| `trade_audits` | Empreinte digitale du trade : chronomètres (SEC publish → regex → spread → ordre), résultats Regex, spread bid/ask à l'exécution, statut de l'ordre |
-| `golden_hour_ticks` | Hypertable TimescaleDB : prix/volume/VWAP seconde par seconde pendant les 60 minutes suivant le tir, pour backtester la stratégie |
+| `sniper.assets` | Watchlist du jour + consensus EPS/Revenue chargé en pre-market |
+| `sniper.trade_audits` | Empreinte digitale du trade : chronomètres (SEC publish → regex → spread → ordre), résultats Regex, spread bid/ask à l'exécution, statut de l'ordre |
+| `sniper.golden_hour_ticks` | Hypertable TimescaleDB : prix/volume/VWAP seconde par seconde pendant les 60 minutes suivant le tir, pour backtester la stratégie |
 
 ## 3. Déroulé fonctionnel (les 4 phases)
 
@@ -147,27 +151,22 @@ la SEC bloque les User-Agent génériques (voir la
 Si une instance PostgreSQL tourne déjà localement pour un autre projet, on
 peut la réutiliser au lieu de faire tourner une seconde instance Postgres
 dédiée à ce projet — c'était d'ailleurs la contrainte d'infrastructure
-d'origine du cahier des charges.
+d'origine du cahier des charges. Grâce au schéma dédié `sniper` (voir
+section 2), **pas besoin de créer une base séparée** : on peut directement
+réutiliser la base d'un autre projet, nos tables vivront dans leur propre
+schéma isolé, à côté de son schéma `public`.
 
-**Ne jamais réutiliser la base d'un autre projet directement** : crée une
-base dédiée sur cette même instance pour éviter toute collision de noms de
-table (ex: `assets` existe potentiellement déjà ailleurs avec un schéma
-différent).
+Connecté à la base existante (celle de l'autre projet), exécute le contenu de
+`sql/01_init_assets.sql`, `sql/02_create_audits.sql` et `sql/03_golden_hour.sql`
+dans l'ordre (l'auto-exécution Docker via `docker-entrypoint-initdb.d` ne
+s'applique qu'à un volume Postgres fraîchement créé, pas à une instance
+existante) — ils créent le schéma `sniper` s'il n'existe pas encore, puis nos
+3 tables dedans.
 
-```sql
--- Depuis un client SQL connecté à l'instance existante :
-CREATE DATABASE trading_sec_sniper;
-```
-
-Puis, connecté à cette nouvelle base, exécute le contenu de `sql/01_init_assets.sql`,
-`sql/02_create_audits.sql` et `sql/03_golden_hour.sql` dans l'ordre (l'auto-exécution
-Docker via `docker-entrypoint-initdb.d` ne s'applique qu'à un volume Postgres
-fraîchement créé, pas à une instance existante).
-
-Ajuste `.env` :
+Ajuste `.env` pour pointer vers cette instance :
 ```env
 POSTGRES_PORT=<port publié par l'instance existante>
-POSTGRES_DB=trading_sec_sniper
+POSTGRES_DB=<nom de la base existante de l'autre projet>
 ```
 
 Puis utilise `docker-compose.external-db.yml` (voir les commentaires du
