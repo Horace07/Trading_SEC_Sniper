@@ -104,9 +104,32 @@ Trading_SEC_Sniper/
 
 ## 5. Mise en route
 
+### Option A — Tout-Docker (recommandé, "plug and play")
+
+Aucune installation Python locale requise : l'application tourne dans un
+conteneur Linux, aux côtés de PostgreSQL/TimescaleDB. Utile en particulier
+sous Windows, où des outils comme *Smart App Control* bloquent parfois les
+bibliothèques compilées (`pandas`, `numpy`) installées via `pip` en dehors
+d'un conteneur.
+
+```bash
+cp .env.example .env               # renseigner les clés Alpaca + SEC_USER_AGENT (optionnel pour les tests)
+docker compose up -d --build       # démarre PostgreSQL/TimescaleDB + construit l'image app
+docker compose run --rm app pytest -v          # tests unitaires
+docker compose run --rm app python -m src.main_sniper <CIK> <SYMBOL>
+```
+
+`docker compose run --rm app <commande>` exécute n'importe quelle commande
+Python dans le même environnement (dépendances déjà installées, réseau
+partagé avec `postgres`) sans laisser de conteneur derrière. Le dossier du
+projet est monté dans le conteneur : toute modification du code est prise en
+compte immédiatement, sans reconstruire l'image.
+
+### Option B — Python local (venv)
+
 ```bash
 cp .env.example .env               # renseigner les clés Alpaca + SEC_USER_AGENT
-docker compose up -d               # démarre PostgreSQL/TimescaleDB + applique sql/
+docker compose up -d               # démarre uniquement PostgreSQL/TimescaleDB + applique sql/
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 

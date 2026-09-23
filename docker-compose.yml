@@ -20,5 +20,24 @@ services:
       timeout: 5s
       retries: 10
 
+  app:
+    build: .
+    container_name: trading_sec_sniper_app
+    # `required: false` : le service démarre même sans .env (ex: `docker
+    # compose run app pytest` juste après un clone, sans clés API).
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # À l'intérieur du réseau Docker, la base s'appelle "postgres", pas
+      # 127.0.0.1 : cette valeur écrase celle éventuellement définie dans .env.
+      POSTGRES_HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: pytest -v
+
 volumes:
   pgdata:
