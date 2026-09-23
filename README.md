@@ -142,6 +142,46 @@ python -m src.main_sniper <CIK> <SYMBOL>
 la SEC bloque les User-Agent génériques (voir la
 [FAQ développeurs SEC EDGAR](https://www.sec.gov/os/webmaster-faq#developers)).
 
+### Option C — Centraliser sur une instance PostgreSQL existante
+
+Si une instance PostgreSQL tourne déjà localement pour un autre projet, on
+peut la réutiliser au lieu de faire tourner une seconde instance Postgres
+dédiée à ce projet — c'était d'ailleurs la contrainte d'infrastructure
+d'origine du cahier des charges.
+
+**Ne jamais réutiliser la base d'un autre projet directement** : crée une
+base dédiée sur cette même instance pour éviter toute collision de noms de
+table (ex: `assets` existe potentiellement déjà ailleurs avec un schéma
+différent).
+
+```sql
+-- Depuis un client SQL connecté à l'instance existante :
+CREATE DATABASE trading_sec_sniper;
+```
+
+Puis, connecté à cette nouvelle base, exécute le contenu de `sql/01_init_assets.sql`,
+`sql/02_create_audits.sql` et `sql/03_golden_hour.sql` dans l'ordre (l'auto-exécution
+Docker via `docker-entrypoint-initdb.d` ne s'applique qu'à un volume Postgres
+fraîchement créé, pas à une instance existante).
+
+Ajuste `.env` :
+```env
+POSTGRES_PORT=<port publié par l'instance existante>
+POSTGRES_DB=trading_sec_sniper
+```
+
+Puis utilise `docker-compose.external-db.yml` (voir les commentaires du
+fichier) pour rediriger le service `app` vers cette instance externe au lieu
+du service `postgres` local :
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.external-db.yml \
+  run --rm --no-deps app pytest -v
+```
+
+`--no-deps` est indispensable : sans lui, Compose démarrerait quand même le
+service `postgres` local, faisant tourner deux instances Postgres pour rien.
+
 ## 6. Tests
 
 - `tests/test_regex_parser.py` — faux textes SEC pour vérifier que la Regex

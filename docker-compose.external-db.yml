@@ -1,0 +1,26 @@
+# Fichier optionnel : à combiner avec docker-compose.yml (via -f) pour faire
+# pointer le service `app` vers une instance PostgreSQL EXTERNE déjà
+# existante sur la machine (ex: celle d'un autre projet), au lieu du service
+# `postgres` local défini dans docker-compose.yml.
+#
+# Usage :
+#   docker compose -f docker-compose.yml -f docker-compose.external-db.yml \
+#     run --rm --no-deps app <commande>
+#
+# --no-deps est indispensable : sans lui, Compose démarrerait quand même le
+# service `postgres` local (ignoré ici mais toujours déclaré dans
+# docker-compose.yml), ce qui ferait tourner deux instances Postgres pour
+# rien.
+#
+# Prérequis côté .env : POSTGRES_PORT doit correspondre au port publié par
+# l'instance externe, et POSTGRES_DB à une base DÉDIÉE à ce projet sur cette
+# instance (jamais la base d'un autre projet, pour éviter toute collision de
+# noms de table comme `assets`).
+
+services:
+  app:
+    environment:
+      # host.docker.internal : nom DNS spécial fourni par Docker Desktop
+      # pour joindre un service exposé sur l'hôte Windows depuis un
+      # conteneur, quel que soit le projet Compose qui l'a démarré.
+      POSTGRES_HOST: host.docker.internal
