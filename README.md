@@ -53,6 +53,11 @@ table avec un autre projet.
 | `sniper.trade_audits` | Empreinte digitale du trade : chronomètres (SEC publish → regex → spread → ordre), résultats Regex, spread bid/ask à l'exécution, statut de l'ordre |
 | `sniper.golden_hour_ticks` | Hypertable TimescaleDB : prix/volume/VWAP seconde par seconde pendant les 60 minutes suivant le tir, pour backtester la stratégie |
 
+Documentation complète des champs (but + commentaire de chaque colonne) :
+[`docs/DATA_MODEL.md`](docs/DATA_MODEL.md). Les mêmes commentaires sont
+aussi appliqués directement dans PostgreSQL par `sql/04_comments.sql`
+(visibles dans DBeaver, onglet "Properties" de chaque table/colonne).
+
 ## 3. Déroulé fonctionnel (les 4 phases)
 
 **Phase 1 — Pre-Market (`Sniper.start`)**
